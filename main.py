@@ -1,17 +1,22 @@
-from selenium import webdriver
 import time
 
+from selenium import webdriver
+from selenium.common import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-USERNAME = "a_zhetpisbaev@kbtu.kz"
-PASSWORD = "ta(hiQW&"
+USERNAME = ""
+PASSWORD = ""
+UPDATE_INTERVAL = 60  # time in seconds on how often to update the page
+WAIT_TIME = 10  # time in seconds to wait for target element to appear, if it doesn't appear, the function will return
+SHOW_UI = True  # if True, the browser instance will be open. If False, it will be headless, which requires less cpu
 
-def try_to_attend(driver):
-    wait = WebDriverWait(driver, 10)
-    page_source = driver.page_source
+
+def try_to_attend(selenium_driver):
+    wait = WebDriverWait(selenium_driver, WAIT_TIME)
+    page_source = selenium_driver.page_source
     if 'Нет доступных дисциплин' in page_source:
         return
 
@@ -26,28 +31,29 @@ def try_to_attend(driver):
             if button_div is not None:
                 button_div.click()
                 time.sleep(1)
+    except TimeoutException:
+        return
     except Exception as e:
         print(e)
         try_to_attend(driver)
 
 
-def main(driver):
-    driver.get("https://wsp.kbtu.kz/RegistrationOnline")
+def main(selenium_driver):
+    selenium_driver.get("https://wsp.kbtu.kz/RegistrationOnline")
 
     while True:
         time.sleep(1)
-        page_source = driver.page_source
-        # table = wait.until(EC.presence_of_element_located((By.TAG_NAME, 'table')))
+        page_source = selenium_driver.page_source
         if 'Вход в систему' in page_source:
-            login(driver)
+            login(selenium_driver)
 
-        try_to_attend(driver)
-        time.sleep(60)
-        driver.refresh()
+        try_to_attend(selenium_driver)
+        time.sleep(UPDATE_INTERVAL)
+        selenium_driver.refresh()
 
 
-def login(driver):
-    wait = WebDriverWait(driver, 10)
+def login(selenium_driver):
+    wait = WebDriverWait(selenium_driver, WAIT_TIME)
 
     username_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="text"]')))
     if username_input is not None:
@@ -60,19 +66,30 @@ def login(driver):
     if password_input is not None:
         password_input.send_keys(PASSWORD)
 
-    checkbox = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="checkbox"]')))
-    parent_element = driver.execute_script("return arguments[0].parentElement;", checkbox)
+    checkbox = wait.until(
+        EC.presence_of_element_located(
+            (By.XPATH, '//input[@type="checkbox"]')
+        )
+    )
+    parent_element = selenium_driver.execute_script("return arguments[0].parentElement;", checkbox)
     if parent_element is not None:
         parent_element.click()
 
-    submit_button = wait.until(EC.presence_of_element_located((By.XPATH, '//div[@role="button" and contains(@class, "v-button-primary")]')))
+    submit_button = wait.until(
+        EC.presence_of_element_located(
+            (By.XPATH, '//div[@role="button" and contains(@class, "v-button-primary")]')
+        )
+    )
     if submit_button is not None:
         submit_button.click()
 
 
 if __name__ == "__main__":
     options = webdriver.ChromeOptions()
-    # options.add_argument('--headless')
+
+    if not SHOW_UI:
+        options.add_argument('--headless')
+
     driver = webdriver.Chrome(options=options)
     try:
         main(driver)
