@@ -17,7 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 USERNAME = os.getenv('USERNAME', 'a_kunanbayev')
 PASSWORD = os.getenv('PASSWORD', 'Master2005.')
 UPDATE_INTERVAL = 60  # time in seconds on how often to update the page
-WAIT_TIME = 10  # time in seconds to wait for target element to appear, if it doesn't appear, the function will return
+WAIT_TIME = 30  # time in seconds to wait for target element to appear, if it doesn't appear, the function will return
 SHOW_UI = False  # if True, the browser instance will be open. If False, it will be headless, which requires less cpu
 
 # Global variables for server
