@@ -14,3 +14,5 @@ typing_extensions==4.12.2
 urllib3==2.2.3
 websocket-client==1.8.0
 wsproto==1.2.0
+flask==3.0.0
+apscheduler==3.10.4

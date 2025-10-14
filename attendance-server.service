@@ -1,0 +1,17 @@
+[Unit]
+Description=Auto Attendance Server
+After=network.target
+
+[Service]
+Type=simple
+User=nura
+WorkingDirectory=/Users/nura/Desktop/autoattend
+Environment=PATH=/Users/nura/Desktop/autoattend/venv/bin
+ExecStart=/Users/nura/Desktop/autoattend/venv/bin/python main.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
