@@ -209,6 +209,11 @@ def health():
     """Health check endpoint"""
     return jsonify({"status": "healthy", "timestamp": datetime.now().isoformat()})
 
+@app.route('/ping')
+def ping():
+    """Ping endpoint to keep server awake"""
+    return jsonify({"status": "awake", "timestamp": datetime.now().isoformat()})
+
 def start_server():
     """Start the Flask server and scheduler"""
     global driver
