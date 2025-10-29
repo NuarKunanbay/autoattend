@@ -13,9 +13,9 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-# Get credentials from environment variables or use defaults
-USERNAME = os.getenv('USERNAME', 'a_kunanbayev')
-PASSWORD = os.getenv('PASSWORD', 'Master2005.')
+# Get credentials strictly from environment variables (no hardcoded defaults)
+USERNAME = os.getenv('USERNAME')
+PASSWORD = os.getenv('PASSWORD')
 UPDATE_INTERVAL = 60  # time in seconds on how often to update the page
 WAIT_TIME = 30  # time in seconds to wait for target element to appear, if it doesn't appear, the function will return
 SHOW_UI = False  # if True, the browser instance will be open. If False, it will be headless, which requires less cpu
@@ -219,6 +219,10 @@ def start_server():
     global driver
     
     try:
+        # Validate credentials are provided via environment
+        if not USERNAME or not PASSWORD:
+            logging.error("Missing USERNAME or PASSWORD environment variables")
+            raise RuntimeError("Set USERNAME and PASSWORD environment variables")
         # Initialize WebDriver
         logging.info("Initializing WebDriver...")
         initialize_driver()
