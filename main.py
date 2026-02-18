@@ -158,18 +158,43 @@ def initialize_driver():
     """Initialize the Selenium WebDriver"""
     global driver
     try:
+        from selenium.webdriver.chrome.service import Service
+        
         options = webdriver.ChromeOptions()
         
         if not SHOW_UI:
             options.add_argument('--headless')
         
-        # Additional options for stability
+        # Additional options for stability (especially for containerized environments like Render)
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
+        options.add_argument('--disable-setuid-sandbox')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-software-rasterizer')
+        # Single process mode for low-memory environments (Render free tier)
+        # Note: Can cause stability issues, use only if memory is very limited
+        if os.getenv('USE_SINGLE_PROCESS', 'false').lower() == 'true':
+            options.add_argument('--single-process')
+        # Additional stability options
+        options.add_argument('--disable-background-timer-throttling')
+        options.add_argument('--disable-backgrounding-occluded-windows')
+        options.add_argument('--disable-renderer-backgrounding')
         
-        driver = webdriver.Chrome(options=options)
+        # Try to find ChromeDriver in common locations
+        import shutil
+        chromedriver_path = shutil.which('chromedriver') or '/usr/local/bin/chromedriver'
+        
+        try:
+            # Use Service to explicitly set ChromeDriver path
+            service = Service(chromedriver_path)
+            driver = webdriver.Chrome(service=service, options=options)
+        except Exception as e:
+            logging.warning(f"Failed to use explicit ChromeDriver path, trying default: {str(e)}")
+            # Fallback to default location
+            driver = webdriver.Chrome(options=options)
+        
         driver.get("https://wsp.kbtu.kz/RegistrationOnline")
         logging.info("WebDriver initialized successfully")
         
@@ -239,8 +264,10 @@ def start_server():
         scheduler.start()
         
         # Start Flask server
-        logging.info("Starting Flask server on port 5000...")
-        app.run(host='0.0.0.0', port=5000, debug=False, threaded=True)
+        # Use PORT environment variable for Render/cloud platforms, fallback to 5000
+        port = int(os.getenv('PORT', 5000))
+        logging.info(f"Starting Flask server on port {port}...")
+        app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
         
     except Exception as e:
         logging.error(f"Failed to start server: {str(e)}")
