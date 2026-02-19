@@ -129,6 +129,8 @@ def run_attendance_check():
             if 'Вход в систему' in page_source:
                 logging.info("Login required, attempting to login")
                 login(driver)
+                # Wait a bit longer after login for page to fully load
+                time.sleep(3)
             
             # Run attendance check
             try_to_attend(driver)
@@ -150,19 +152,25 @@ def run_attendance_check():
 
 def login(selenium_driver):
     try:
+        logging.info("Starting login process...")
         wait = WebDriverWait(selenium_driver, WAIT_TIME)
 
+        logging.info("Looking for username input...")
         username_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="text"]')))
         if username_input is not None:
             username_input.clear()
             username_input.send_keys(USERNAME)
+            logging.info("Username entered")
 
-        time.sleep(1)
+        time.sleep(2)  # Increased wait for container environments
 
+        logging.info("Looking for password input...")
         password_input = wait.until(EC.presence_of_element_located((By.XPATH, '//input[@type="password"]')))
         if password_input is not None:
             password_input.send_keys(PASSWORD)
+            logging.info("Password entered")
 
+        logging.info("Looking for checkbox...")
         checkbox = wait.until(
             EC.presence_of_element_located(
                 (By.XPATH, '//input[@type="checkbox"]')
@@ -171,19 +179,27 @@ def login(selenium_driver):
         parent_element = selenium_driver.execute_script("return arguments[0].parentElement;", checkbox)
         if parent_element is not None:
             parent_element.click()
+            logging.info("Checkbox clicked")
 
+        time.sleep(1)
+
+        logging.info("Looking for submit button...")
         submit_button = wait.until(
-            EC.presence_of_element_located(
+            EC.element_to_be_clickable(
                 (By.XPATH, '//div[@role="button" and contains(@class, "v-button-primary")]')
             )
         )
         if submit_button is not None:
             submit_button.click()
+            logging.info("Submit button clicked")
         
+        # Wait for page to load after login
+        time.sleep(3)
         logging.info("Login attempt completed")
         
     except Exception as e:
         logging.error(f"Error during login: {str(e)}")
+        logging.error(f"Page source snippet: {selenium_driver.page_source[:500]}")
         raise
 
 
@@ -218,18 +234,41 @@ def initialize_driver():
         # Try to find ChromeDriver in common locations
         import shutil
         chromedriver_path = shutil.which('chromedriver') or '/usr/local/bin/chromedriver'
+        logging.info(f"Attempting to use ChromeDriver at: {chromedriver_path}")
+        
+        # Verify ChromeDriver exists and is executable
+        import os
+        if os.path.exists(chromedriver_path):
+            if not os.access(chromedriver_path, os.X_OK):
+                logging.warning(f"ChromeDriver exists but is not executable, attempting to fix permissions")
+                try:
+                    os.chmod(chromedriver_path, 0o755)
+                except Exception as perm_error:
+                    logging.warning(f"Could not fix permissions: {str(perm_error)}")
+        else:
+            logging.warning(f"ChromeDriver not found at {chromedriver_path}, will try default location")
         
         try:
             # Use Service to explicitly set ChromeDriver path
             service = Service(chromedriver_path)
+            logging.info("Creating Chrome WebDriver with explicit service...")
             driver = webdriver.Chrome(service=service, options=options)
+            logging.info("Chrome WebDriver created successfully")
         except Exception as e:
-            logging.warning(f"Failed to use explicit ChromeDriver path, trying default: {str(e)}")
-            # Fallback to default location
-            driver = webdriver.Chrome(options=options)
+            logging.warning(f"Failed to use explicit ChromeDriver path ({chromedriver_path}), trying default: {str(e)}")
+            try:
+                # Fallback to default location
+                driver = webdriver.Chrome(options=options)
+                logging.info("Chrome WebDriver created with default path")
+            except Exception as e2:
+                logging.error(f"Failed to create Chrome WebDriver with default path: {str(e2)}")
+                raise
         
+        # Navigate to page with longer timeout for container environments
+        logging.info("Navigating to registration page...")
+        driver.set_page_load_timeout(60)  # Increase timeout for slower container networks
         driver.get("https://wsp.kbtu.kz/RegistrationOnline")
-        logging.info("WebDriver initialized successfully")
+        logging.info("WebDriver initialized successfully and page loaded")
         
     except Exception as e:
         logging.error(f"Failed to initialize WebDriver: {str(e)}")
