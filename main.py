@@ -50,21 +50,54 @@ def try_to_attend(selenium_driver):
             logging.info("No available subjects found")
             return
 
+        # Wait for buttons to be present AND clickable
+        logging.info("Looking for attendance buttons...")
         button_divs = wait.until(
             EC.presence_of_all_elements_located(
                 (By.XPATH, "//div[span/span[@class='v-button-caption' and text()='Отметиться']]")
             )
         )
+        logging.info(f"Found {len(button_divs)} attendance button(s)")
 
         attendance_count = 0
-        for button_div in button_divs:
+        for i, button_div in enumerate(button_divs):
             if button_div is not None:
-                button_div.click()
-                attendance_count += 1
-                time.sleep(1)
+                try:
+                    # Check if button is displayed and enabled
+                    if not button_div.is_displayed() or not button_div.is_enabled():
+                        logging.warning(f"Button {i+1} is not clickable (displayed: {button_div.is_displayed()}, enabled: {button_div.is_enabled()})")
+                        # Try to wait a bit and check again
+                        time.sleep(1)
+                        if not button_div.is_displayed() or not button_div.is_enabled():
+                            continue
+                    
+                    # Scroll button into view
+                    selenium_driver.execute_script("arguments[0].scrollIntoView({block: 'center', behavior: 'smooth'});", button_div)
+                    time.sleep(0.5)  # Brief pause after scrolling
+                    
+                    # Try standard click first
+                    try:
+                        button_div.click()
+                        logging.info(f"Successfully clicked attendance button {i+1} using standard click")
+                    except Exception as click_error:
+                        # Fallback to JavaScript click if standard click fails
+                        logging.warning(f"Standard click failed for button {i+1}, trying JavaScript click: {str(click_error)}")
+                        selenium_driver.execute_script("arguments[0].click();", button_div)
+                        logging.info(f"Successfully clicked attendance button {i+1} using JavaScript click")
+                    
+                    attendance_count += 1
+                    time.sleep(2)  # Wait a bit longer between clicks to ensure page processes
+                    
+                except Exception as button_error:
+                    logging.error(f"Failed to click button {i+1}: {str(button_error)}")
+                    continue
         
-        last_run_status = f"Successfully attended {attendance_count} classes"
-        logging.info(f"Successfully attended {attendance_count} classes")
+        if attendance_count > 0:
+            last_run_status = f"Successfully attended {attendance_count} classes"
+            logging.info(f"Successfully attended {attendance_count} classes")
+        else:
+            last_run_status = "No buttons were clickable"
+            logging.warning("Found buttons but none were clickable")
         
     except TimeoutException:
         last_run_status = "Timeout waiting for attendance buttons"
