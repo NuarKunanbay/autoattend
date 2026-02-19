@@ -55,19 +55,19 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearm
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver (matching Chrome version)
-# Use sed instead of grep -oP for better compatibility
-RUN CHROME_VERSION=$(google-chrome --version | sed 's/.* \([0-9.]*\).*/\1/' | head -1) \
-    && CHROME_MAJOR_VERSION=$(echo $CHROME_VERSION | cut -d. -f1) \
-    && echo "Chrome version: $CHROME_VERSION, Major: $CHROME_MAJOR_VERSION" \
-    && CHROME_DRIVER_VERSION=$(curl -sS "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR_VERSION}" 2>/dev/null || curl -sS https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE) \
-    && echo "ChromeDriver version: $CHROME_DRIVER_VERSION" \
-    && wget -q -N https://storage.googleapis.com/chrome-for-testing-public/$CHROME_DRIVER_VERSION/linux64/chromedriver-linux64.zip \
-    && unzip -q chromedriver-linux64.zip \
-    && mv chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
+# Install ChromeDriver
+# Get latest stable ChromeDriver version
+RUN set -e \
+    && CHROME_DRIVER_VERSION=$(curl -sS https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE || echo "131.0.6778.85") \
+    && echo "Installing ChromeDriver version: $CHROME_DRIVER_VERSION" \
+    && wget -q --no-check-certificate https://storage.googleapis.com/chrome-for-testing-public/$CHROME_DRIVER_VERSION/linux64/chromedriver-linux64.zip -O /tmp/chromedriver.zip \
+    && test -f /tmp/chromedriver.zip \
+    && unzip -q /tmp/chromedriver.zip -d /tmp \
+    && test -f /tmp/chromedriver-linux64/chromedriver \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
     && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf chromedriver-linux64.zip chromedriver-linux64 \
-    && chromedriver --version \
+    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64 \
+    && /usr/local/bin/chromedriver --version \
     && echo "ChromeDriver installed successfully"
 
 # Copy requirements and install Python dependencies
