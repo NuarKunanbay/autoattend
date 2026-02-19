@@ -237,7 +237,6 @@ def initialize_driver():
         logging.info(f"Attempting to use ChromeDriver at: {chromedriver_path}")
         
         # Verify ChromeDriver exists and is executable
-        import os
         if os.path.exists(chromedriver_path):
             if not os.access(chromedriver_path, os.X_OK):
                 logging.warning(f"ChromeDriver exists but is not executable, attempting to fix permissions")
