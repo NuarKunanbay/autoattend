@@ -1,6 +1,9 @@
 import os
 import time
+from datetime import datetime
+from threading import Thread
 
+from flask import Flask
 from selenium import webdriver
 from selenium.common import TimeoutException
 from selenium.webdriver.common.by import By
@@ -15,12 +18,23 @@ UPDATE_INTERVAL = 60  # time in seconds on how often to update the page
 WAIT_TIME = 10  # time in seconds to wait for target element to appear
 SHOW_UI = os.environ.get("SHOW_UI", "false").lower() == "true"  # headless on server by default
 
+# Status for the status page (updated by the attendance loop)
+status = {
+    "running": False,
+    "last_check": None,
+    "last_result": "Not run yet",
+    "error": None,
+    "total_checks": 0,
+    "total_attended": 0,
+}
+
 
 def try_to_attend(selenium_driver):
+    """Returns number of attendance buttons clicked (0 if none or error)."""
     wait = WebDriverWait(selenium_driver, WAIT_TIME)
     page_source = selenium_driver.page_source
-    if 'Нет доступных дисциплин' in page_source:
-        return
+    if "Нет доступных дисциплин" in page_source:
+        return 0
 
     try:
         button_divs = wait.until(
@@ -28,30 +42,58 @@ def try_to_attend(selenium_driver):
                 (By.XPATH, "//div[span/span[@class='v-button-caption' and text()='Отметиться']]")
             )
         )
-
+        count = 0
         for button_div in button_divs:
             if button_div is not None:
                 button_div.click()
+                count += 1
                 time.sleep(1)
+        return count
     except TimeoutException:
-        return
+        return 0
     except Exception as e:
         print(e)
-        try_to_attend(selenium_driver)
+        return try_to_attend(selenium_driver)
 
 
-def main(selenium_driver):
-    selenium_driver.get("https://wsp.kbtu.kz/RegistrationOnline")
+def run_attendance_loop(driver):
+    """Runs in a background thread; updates global status."""
+    global status
+    status["running"] = True
+    status["error"] = None
+    try:
+        driver.get("https://wsp.kbtu.kz/RegistrationOnline")
+        while True:
+            time.sleep(1)
+            page_source = driver.page_source
+            if "Вход в систему" in page_source:
+                login(driver)
+                time.sleep(2)
 
-    while True:
-        time.sleep(1)
-        page_source = selenium_driver.page_source
-        if 'Вход в систему' in page_source:
-            login(selenium_driver)
+            count = try_to_attend(driver)
+            status["last_check"] = datetime.utcnow().isoformat() + "Z"
+            status["total_checks"] += 1
+            if count > 0:
+                status["total_attended"] += count
+                status["last_result"] = f"Attended {count} class(es)"
+            else:
+                status["last_result"] = "No attendance available (or no button found)"
+            print(f"[{status['last_check']}] {status['last_result']} (total attended so far: {status['total_attended']})")
 
-        try_to_attend(selenium_driver)
-        time.sleep(UPDATE_INTERVAL)
-        selenium_driver.refresh()
+            time.sleep(UPDATE_INTERVAL)
+            driver.refresh()
+    except Exception as e:
+        status["running"] = False
+        status["error"] = str(e)
+        status["last_result"] = f"Error: {str(e)}"
+        print(f"Error: {e}")
+    finally:
+        status["running"] = False
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
 
 def login(selenium_driver):
@@ -86,6 +128,37 @@ def login(selenium_driver):
         submit_button.click()
 
 
+app = Flask(__name__)
+
+
+@app.route("/")
+def index():
+    """Status page: is it running, last result, total attended."""
+    s = status
+    running_text = "Yes" if s["running"] else "No"
+    return (
+        f"<h1>Auto-attend status</h1>"
+        f"<p><b>Running:</b> {running_text}</p>"
+        f"<p><b>Last check:</b> {s['last_check'] or '—'}</p>"
+        f"<p><b>Last result:</b> {s['last_result']}</p>"
+        f"<p><b>Total checks:</b> {s['total_checks']}</p>"
+        f"<p><b>Total attended (all time):</b> {s['total_attended']}</p>"
+        f"<p><b>Error:</b> {s['error'] or '—'}</p>"
+    )
+
+
+@app.route("/health")
+def health():
+    """For Render health checks."""
+    return {"ok": True}, 200
+
+
+@app.route("/status")
+def status_json():
+    """JSON status for scripts."""
+    return status
+
+
 if __name__ == "__main__":
     if not USERNAME or not PASSWORD:
         print("Set USERNAME and PASSWORD in main.py or environment (e.g. export USERNAME=... PASSWORD=...)")
@@ -100,9 +173,9 @@ if __name__ == "__main__":
         options.add_argument("--window-size=1920,1080")
 
     driver = webdriver.Chrome(options=options)
-    try:
-        main(driver)
-    except Exception as e:
-        print(e)
-    finally:
-        driver.quit()
+    thread = Thread(target=run_attendance_loop, args=(driver,), daemon=True)
+    thread.start()
+
+    port = int(os.environ.get("PORT", 5000))
+    print(f"Status server on http://0.0.0.0:{port} — attendance loop running in background")
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
