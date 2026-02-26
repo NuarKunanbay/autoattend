@@ -1,0 +1,17 @@
+[Unit]
+Description=KBTU Auto Attendance
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/path/to/autoattend
+Environment="USERNAME=your_username"
+Environment="PASSWORD=your_password"
+Environment="SHOW_UI=false"
+ExecStart=/path/to/autoattend/venv/bin/python main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

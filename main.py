@@ -1,3 +1,4 @@
+import os
 import time
 
 from selenium import webdriver
@@ -7,11 +8,12 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 
-USERNAME = ""
-PASSWORD = ""
+# Credentials: set in main.py or via env vars USERNAME and PASSWORD (env preferred on server)
+USERNAME = os.environ.get("USERNAME", "")
+PASSWORD = os.environ.get("PASSWORD", "")
 UPDATE_INTERVAL = 60  # time in seconds on how often to update the page
-WAIT_TIME = 10  # time in seconds to wait for target element to appear, if it doesn't appear, the function will return
-SHOW_UI = True  # if True, the browser instance will be open. If False, it will be headless, which requires less cpu
+WAIT_TIME = 10  # time in seconds to wait for target element to appear
+SHOW_UI = os.environ.get("SHOW_UI", "false").lower() == "true"  # headless on server by default
 
 
 def try_to_attend(selenium_driver):
@@ -35,7 +37,7 @@ def try_to_attend(selenium_driver):
         return
     except Exception as e:
         print(e)
-        try_to_attend(driver)
+        try_to_attend(selenium_driver)
 
 
 def main(selenium_driver):
@@ -85,10 +87,17 @@ def login(selenium_driver):
 
 
 if __name__ == "__main__":
-    options = webdriver.ChromeOptions()
+    if not USERNAME or not PASSWORD:
+        print("Set USERNAME and PASSWORD in main.py or environment (e.g. export USERNAME=... PASSWORD=...)")
+        exit(1)
 
+    options = webdriver.ChromeOptions()
     if not SHOW_UI:
-        options.add_argument('--headless')
+        options.add_argument("--headless")
+        options.add_argument("--no-sandbox")
+        options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
+        options.add_argument("--window-size=1920,1080")
 
     driver = webdriver.Chrome(options=options)
     try:
