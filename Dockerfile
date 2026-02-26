@@ -13,13 +13,17 @@ RUN apt-get update && apt-get install -y \
     && apt-get update && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# ChromeDriver (latest stable)
-RUN CHROMEDRIVER_VERSION=$(curl -sS https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE) \
-    && wget -q https://storage.googleapis.com/chrome-for-testing-public/$CHROMEDRIVER_VERSION/linux64/chromedriver-linux64.zip -O /tmp/chromedriver.zip \
+# ChromeDriver: install version that matches installed Chrome (major version)
+RUN CHROME_MAJOR=$(google-chrome --version | sed 's/.* \([0-9]*\)\..*/\1/') \
+    && echo "Chrome major version: $CHROME_MAJOR" \
+    && CHROMEDRIVER_VERSION=$(curl -sS "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_${CHROME_MAJOR}") \
+    && echo "ChromeDriver version: $CHROMEDRIVER_VERSION" \
+    && wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" -O /tmp/chromedriver.zip \
     && unzip -q /tmp/chromedriver.zip -d /tmp \
     && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/ \
     && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
+    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64 \
+    && chromedriver --version
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
